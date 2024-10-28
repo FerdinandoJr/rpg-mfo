@@ -63,11 +63,6 @@ VictoryMonster ==
     /\ creatures[Mage].hp <= 0
     /\ UNCHANGED <<creatures, turns>>
 
-(* Verifica se ocorreu uma condição de vitória *)
-CheckVictory ==
-    \/ (VictoryHeroes /\ UNCHANGED <<creatures, turns>>)
-    \/ (VictoryMonster /\ UNCHANGED <<creatures, turns>>)
-
 TurnMage ==
     /\ turns # <<>>                (* Verifica se turns não está vazio *)
     /\ Head(turns) = Mage
@@ -126,7 +121,6 @@ ResetTurn ==
 
 (* Transição de turno com condição de parada *)
 Next ==
-    \/ CheckVictory
     \/ (turns = <<>> /\ ResetTurn)
     \/ TurnMage
     \/ TurnDruid
