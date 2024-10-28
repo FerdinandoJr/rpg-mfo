@@ -23,25 +23,25 @@ Init ==
 		Hunter |-> [
 			    hp |-> 20,			
                 initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
-                attack |-> 5,
+                attack |-> 10,
                 isParalyzed |-> FALSE
 		    ], 
 		Druid |-> [
 			    hp |-> 20,			
                 initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
-                attack |-> 5,
+                attack |-> 10,
                 isParalyzed |-> FALSE
 		    ], 
 		Mage |-> [
 			    hp |-> 20,
                 initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
-                attack |-> 5,
+                attack |-> 10,
                 isParalyzed |-> FALSE
 		    ],
 		Monster |-> [
                 hp |-> 100,
                 initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
-                attack |-> 5,
+                attack |-> 20,
                 isParalyzed |-> FALSE
 		    ]
 	    ]   
@@ -65,60 +65,69 @@ VictoryMonster ==
 
 (* Verifica se ocorreu uma condição de vitória *)
 CheckVictory ==
-    \/ VictoryHeroes
-    \/ VictoryMonster
+    \/ (VictoryHeroes /\ UNCHANGED <<creatures, turns>>)
+    \/ (VictoryMonster /\ UNCHANGED <<creatures, turns>>)
 
 TurnMage ==
     /\ turns # <<>>                (* Verifica se turns não está vazio *)
     /\ Head(turns) = Mage
-    /\ creatures[Monster].hp > 0
-    /\ creatures' = [creatures EXCEPT 
-            ![Monster].hp = @ - creatures[Mage].attack
-        ]
-    /\ turns' = Tail(turns)
-    
+    /\ IF creatures[Mage].hp > 0
+        THEN /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - creatures[Mage].attack]
+             /\ turns' = Tail(turns)   (* Após atacar, remove a vez do Mage *)
+        ELSE /\ turns' = Tail(turns)   (* Apenas remove a vez se o Mage estiver morto *)
+             /\ UNCHANGED <<creatures>>
+
 TurnDruid ==
     /\ turns # <<>>                (* Verifica se turns não está vazio *)
     /\ Head(turns) = Druid
-    /\ creatures[Monster].hp > 0
-    /\ creatures' = [creatures EXCEPT 
-            ![Monster].hp = @ - creatures[Druid].attack            
-        ]
-    /\ turns' = Tail(turns)
+    /\ IF creatures[Druid].hp > 0
+        THEN /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - creatures[Druid].attack]
+             /\ turns' = Tail(turns)   (* Após atacar, remove a vez do Druid *)
+        ELSE /\ turns' = Tail(turns)   (* Apenas remove a vez se o Druid estiver morto *)
+             /\ UNCHANGED <<creatures>>
+
 
 TurnHunter ==
     /\ turns # <<>>                (* Verifica se turns não está vazio *)
     /\ Head(turns) = Hunter
-    /\ creatures[Monster].hp > 0
-    /\ creatures' = [creatures EXCEPT 
-            ![Monster].hp = @ - creatures[Hunter].attack
-        ]
-    /\ turns' = Tail(turns)
+    /\ IF creatures[Hunter].hp > 0
+        THEN /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - creatures[Hunter].attack]
+             /\ turns' = Tail(turns)   (* Após atacar, remove a vez do Hunter *)
+        ELSE /\ turns' = Tail(turns)   (* Apenas remove a vez se o Hunter estiver morto *)
+             /\ UNCHANGED <<creatures>>
+
 
 TurnMonster ==    
     /\ turns # <<>>                (* Verifica se turns não está vazio *)
     /\ Head(turns) = Monster
-    /\ creatures' = [creatures EXCEPT 
-            ![Hunter].hp = @ - creatures[Monster].attack,
-            ![Druid].hp = @ - creatures[Monster].attack, 
-            ![Mage].hp = @ - creatures[Monster].attack
-        ]
+    /\ creatures' = 
+        LET targetHero == CHOOSE h \in {Hunter, Druid, Mage} : creatures[h].hp > 0
+        IN [creatures EXCEPT 
+                ![targetHero].hp = @ - creatures[Monster].attack
+            ]
     /\ turns' = Tail(turns)
 
-NextTurn ==    
+ResetTurn == 
     /\ turns = <<>>
-    /\ turns'= SortSeq(<<Hunter, Druid, Mage, Monster>>,
-                 LAMBDA x, y: 
-                     IF creatures[x].initiative = creatures[y].initiative 
-                     THEN CreatureOrder[x] < CreatureOrder[y]
-                     ELSE creatures[x].initiative > creatures[y].initiative)
-    /\ UNCHANGED <<creatures>>
+    /\ IF creatures[Monster].hp <= 0 
+        THEN /\ VictoryHeroes (* Herois ganham *)
+        ELSE IF \A h \in {Hunter, Druid, Mage} : creatures[h].hp <= 0
+            THEN /\ VictoryMonster (* Monstros ganham *)
+            ELSE /\ turns' = SortSeq(
+                    SelectSeq(<<Hunter, Druid, Mage, Monster>>, LAMBDA x: creatures[x].hp > 0),
+                    LAMBDA x, y: 
+                        IF creatures[x].initiative = creatures[y].initiative 
+                        THEN CreatureOrder[x] < CreatureOrder[y]
+                        ELSE creatures[x].initiative > creatures[y].initiative
+                    )
+                 /\ UNCHANGED <<creatures>>
+
 
 
 (* Transição de turno com condição de parada *)
 Next ==
     \/ CheckVictory
-    \/ NextTurn  (* Recarrega turns quando vazio *)
+    \/ (turns = <<>> /\ ResetTurn)
     \/ TurnMage
     \/ TurnDruid
     \/ TurnHunter
@@ -129,13 +138,11 @@ Spec == Init /\ [][Next]_<<creatures, turns>>
 
 (* COISAS A FAZER
  
- - Vincular as iniciativas aleatórias com a ordem de ataque das criaturas
  - Criar Habilidade Ilusão do Mage
  - Criar Habilidade Cegueira do Hunter
  - Criar Habilidade Transformação selvagem do Druid
  - Criar Habilidade paralisia do Monster
  - Criar Maneira dos personagens sair da paralisa
- - Finalizar de maneira coerente
 
 *)
 
