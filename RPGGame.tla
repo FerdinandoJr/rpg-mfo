@@ -52,14 +52,15 @@ ReduceHP ==
 
 (* Verifica se o HP do Monster chegou a 0, indicando vitória dos heróis *)
 VictoryHeroes ==
-    creatures[Monster].hp <= 0
-    
+    /\ creatures[Monster].hp <= 0
+    /\ UNCHANGED <<creatures, currentTurn>>
 
 (* Verifica se o HP de todos os heróis chegou a 0, indicando vitória do Monster *)
 VictoryMonster ==
     /\ creatures[Hunter].hp <= 0
     /\ creatures[Druid].hp <= 0
     /\ creatures[Mage].hp <= 0
+    /\ UNCHANGED <<creatures, currentTurn>>
 
 (* Verifica se ocorreu uma condição de vitória *)
 CheckVictory ==
@@ -118,6 +119,7 @@ ResetHasAttacked ==
 
 (* Transição de turno com condição de parada *)
 Next ==
+    \/ CheckVictory
     \/ TurnMage
     \/ TurnDruid
     \/ TurnHunter
@@ -125,8 +127,7 @@ Next ==
     \/ ResetHasAttacked
 
 Spec == Init /\ [][Next]_<<currentTurn, creatures>>
-Invariance == 
-    /\ CheckVictory
+    
 
 (* COISAS A FAZER
  
