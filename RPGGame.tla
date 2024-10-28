@@ -44,7 +44,8 @@ Init ==
                 hp |-> 100,
                 initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
                 attack |-> 20,
-                isParalyzed |-> FALSE
+                isParalyzed |-> FALSE,   
+                isBlind |-> FALSE   (* Atributo para indicar cegueira *)
 		    ]
 	    ]   
     /\ turns = SortSeq(<<Hunter, Druid, Mage, Monster>>,
@@ -71,10 +72,15 @@ TurnHunter ==
     /\ turns # <<>>
     /\ Head(turns) = Hunter
     /\ IF creatures[Hunter].hp > 0
-        THEN /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - creatures[Hunter].attack]
-             /\ turns' = Tail(turns)   (* Após atacar, remove a vez do Hunter *)
-        ELSE /\ turns' = Tail(turns)   (* Apenas remove a vez se o Hunter estiver morto *)
-             /\ UNCHANGED <<creatures>>
+        THEN IF creatures[Monster].isBlind = FALSE  (* Aplica cegueira apenas se o Monstro não estiver cego *)
+                THEN /\ creatures' = [
+                            creatures EXCEPT ![Monster].isBlind = TRUE
+                        ]
+                ELSE /\ creatures' = [
+                            creatures EXCEPT ![Monster].hp = @ - creatures[Hunter].attack
+                        ]                     
+        ELSE /\ UNCHANGED <<creatures>>
+    /\ turns' = Tail(turns)        (* Hunter ataca se o Monstro já estiver cego *)
 
 (* ------ Mage -------*)
 
@@ -118,19 +124,18 @@ TurnDruid ==
                 ELSE /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - creatures[Druid].attack] (* Ataca o monstro *)
     /\ turns' = Tail(turns)                                         (* Remove a vez do Druid *)
 
-
-
-
 (* ------ Monster -------*)
 TurnMonster ==    
     /\ turns # <<>>                           (* Verifica se turns não está vazio *)
     /\ Head(turns) = Monster
     /\ creatures' = 
         LET targetHero == 
-            IF creatures[Druid].isBear = TRUE (* Preferencia para atacar o Druid Transformado *)
+            IF creatures[Druid].isBear = TRUE  (* Preferência para atacar o Druid Transformado *)
                 THEN Druid
                 ELSE CHOOSE h \in {Hunter, Druid, Mage} : creatures[h].hp > 0
-        IN [creatures EXCEPT ![targetHero].hp = @ - creatures[Monster].attack]
+        IN IF creatures[Monster].isBlind 
+            THEN [creatures EXCEPT ![Monster].isBlind = FALSE] (* Termina a cegueira *)
+            ELSE [creatures EXCEPT ![targetHero].hp = @ - creatures[Monster].attack]  (* Ataque normal *)
     /\ turns' = Tail(turns)
 
 ResetTurn == 
