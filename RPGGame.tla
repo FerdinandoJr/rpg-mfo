@@ -20,35 +20,34 @@ Init ==
 		Hunter |-> [
 			    hp |-> 20,
 			    hasAttacked |-> FALSE,
+                attack |-> 5,
                 initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
                 isParalyzed |-> FALSE
 		    ], 
 		Druid |-> [
 			    hp |-> 20,
 			    hasAttacked |-> FALSE,
+                attack |-> 5,
                 initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
                 isParalyzed |-> FALSE
 		    ], 
 		Mage |-> [
 			    hp |-> 20,
 			    hasAttacked |-> FALSE,
+                attack |-> 5,
                 initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
                 isParalyzed |-> FALSE
 		    ],
 		Monster |-> [
                 hp |-> 100,
                 hasAttacked |-> FALSE,
+                attack |-> 5,
                 initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
                 isParalyzed |-> FALSE
 		    ]
 	    ]    
     /\ currentTurn = Mage
 
-(* Ação que reduz 5 pontos de vida da próxima criatura na ordem de iniciativa *)
-ReduceHP == 
-    /\ creatures[Monster].hp > 0 (* Só reduz se ainda tiver HP *)
-    /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - 5]  (* Reduz 5 de HP do atual *)
-    /\ UNCHANGED <<currentTurn>>  (* Mantém o estado de paralisia *)
 
 (* Verifica se o HP do Monster chegou a 0, indicando vitória dos heróis *)
 VictoryHeroes ==
@@ -72,7 +71,7 @@ TurnMage ==
     /\ creatures[Mage].hasAttacked = FALSE
     /\ creatures[Monster].hp > 0 (* Só reduz se ainda tiver HP *)
     /\ creatures' = [ creatures EXCEPT 
-            ![Monster].hp = @ - 5,
+            ![Monster].hp = @ - creatures[Mage].attack,
             ![Mage].hasAttacked = TRUE
         ]
     /\ currentTurn' = Druid  (* Define o próximo personagem a atacar *)
@@ -82,7 +81,7 @@ TurnDruid ==
     /\ creatures[Druid].hasAttacked = FALSE
     /\ creatures[Monster].hp > 0 (* Só reduz se ainda tiver HP *)
     /\ creatures' = [ creatures EXCEPT 
-            ![Monster].hp = @ - 5,
+            ![Monster].hp = @ - creatures[Druid].attack,
             ![Druid].hasAttacked = TRUE
         ]
     /\ currentTurn' = Hunter  (* Define o próximo personagem a atacar *)
@@ -92,7 +91,7 @@ TurnHunter ==
     /\ creatures[Hunter].hasAttacked = FALSE
     /\ creatures[Monster].hp > 0 (* Só reduz se ainda tiver HP *)
     /\ creatures' = [ creatures EXCEPT 
-            ![Monster].hp = @ - 5,
+            ![Monster].hp = @ - creatures[Hunter].attack,
             ![Hunter].hasAttacked = TRUE
         ]    
     /\ currentTurn' = Monster  (* Define o próximo personagem a atacar *)
@@ -101,7 +100,9 @@ TurnMonster ==
     /\ currentTurn = Monster  (* verifique se é o turno do monstro *)
     /\ creatures[Monster].hasAttacked = FALSE
     /\ creatures' = [ creatures EXCEPT 
-            ![Hunter].hp = @ - 5, ![Druid].hp = @ - 5, ![Mage].hp = @ - 5,
+            ![Hunter].hp = @ - creatures[Monster].attack,
+            ![Druid].hp = @ - creatures[Monster].attack, 
+            ![Mage].hp = @ - creatures[Monster].attack,
             ![Monster].hasAttacked = TRUE
         ]
     /\ currentTurn' = Mage
