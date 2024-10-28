@@ -8,10 +8,7 @@ CONSTANTS
     Monster
 
 VARIABLES
-    hp,              (* Pontos de vida de cada criatura *)
-    paralyzed,       (* Indica se cada criatura está paralisada *)
-    initiative,      (* Iniciativa de cada criatura *)    
-    hasAttacked,     (* Status de ataque de cada personagem *)
+    creatures,
     currentTurn
 (* 
     Estado inicial:
@@ -19,33 +16,50 @@ VARIABLES
 *)
 
 Init ==
-    /\ hp = [ Hunter |-> 20, Druid |-> 20, Mage |-> 20, Monster |-> 100 ]
-    /\ paralyzed = [ Hunter |-> FALSE, Druid |-> FALSE, Mage |-> FALSE, Monster |-> FALSE ]
-    /\ initiative = [ (* Define o d20 de cada criatura *)
-            Hunter |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE, 
-            Druid  |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
-            Mage   |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
-            Monster|-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE
-        ]
-    /\ hasAttacked = [ Hunter |-> FALSE, Druid |-> FALSE, Mage |-> FALSE, Monster |-> FALSE ]
+    /\ creatures = [ 
+		Hunter |-> [
+			    hp |-> 20,
+			    hasAttacked |-> FALSE,
+                initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
+                isParalyzed |-> FALSE
+		    ], 
+		Druid |-> [
+			    hp |-> 20,
+			    hasAttacked |-> FALSE,
+                initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
+                isParalyzed |-> FALSE
+		    ], 
+		Mage |-> [
+			    hp |-> 20,
+			    hasAttacked |-> FALSE,
+                initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
+                isParalyzed |-> FALSE
+		    ],
+		Monster |-> [
+                hp |-> 100,
+                hasAttacked |-> FALSE,
+                initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
+                isParalyzed |-> FALSE
+		    ]
+	    ]    
     /\ currentTurn = Mage
 
 (* Ação que reduz 5 pontos de vida da próxima criatura na ordem de iniciativa *)
 ReduceHP == 
-    /\ hp[Monster] > 0 (* Só reduz se ainda tiver HP *)
-    /\ hp' = [hp EXCEPT ![Monster] = @ - 5]  (* Reduz 5 de HP do atual *)
-    /\ UNCHANGED <<paralyzed, hasAttacked, initiative, currentTurn>>  (* Mantém o estado de paralisia *)
+    /\ creatures[Monster].hp > 0 (* Só reduz se ainda tiver HP *)
+    /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - 5]  (* Reduz 5 de HP do atual *)
+    /\ UNCHANGED <<currentTurn>>  (* Mantém o estado de paralisia *)
 
 (* Verifica se o HP do Monster chegou a 0, indicando vitória dos heróis *)
 VictoryHeroes ==
-    hp[Monster] <= 0
+    creatures[Monster].hp <= 0
     
 
 (* Verifica se o HP de todos os heróis chegou a 0, indicando vitória do Monster *)
 VictoryMonster ==
-    /\ hp[Hunter] <= 0
-    /\ hp[Druid] <= 0
-    /\ hp[Mage] <= 0
+    /\ creatures[Hunter].hp <= 0
+    /\ creatures[Druid].hp <= 0
+    /\ creatures[Mage].hp <= 0
 
 (* Verifica se ocorreu uma condição de vitória *)
 CheckVictory ==
@@ -54,44 +68,44 @@ CheckVictory ==
 
 TurnMage ==
     /\ currentTurn = Mage
-    /\ hasAttacked[Mage] = FALSE
-    /\ hp[Monster] > 0 (* Só reduz se ainda tiver HP *)
-    /\ hp' = [hp EXCEPT ![Monster] = @ - 5]
-    /\ hasAttacked' = [hasAttacked EXCEPT ![Mage] = TRUE]
+    /\ creatures[Mage].hasAttacked = FALSE
+    /\ creatures[Monster].hp > 0 (* Só reduz se ainda tiver HP *)
+    /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - 5]
+    /\ creatures' = [creatures EXCEPT ![Mage].hasAttacked = TRUE]
     /\ currentTurn' = Druid  (* Define o próximo personagem a atacar *)
-    /\ UNCHANGED <<paralyzed, initiative>>  (* Mantém o estado de paralisia *)
 
 TurnDruid ==
     /\ currentTurn = Druid
-    /\ hasAttacked[Druid] = FALSE
-    /\ hp[Monster] > 0 (* Só reduz se ainda tiver HP *)
-    /\ hp' = [hp EXCEPT ![Monster] = @ - 5]
-    /\ hasAttacked' = [hasAttacked EXCEPT ![Druid] = TRUE]
+    /\ creatures[Druid].hasAttacked = FALSE
+    /\ creatures[Monster].hp > 0 (* Só reduz se ainda tiver HP *)
+    /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - 5]
+    /\ creatures' = [creatures EXCEPT ![Druid].hasAttacked = TRUE]
     /\ currentTurn' = Hunter  (* Define o próximo personagem a atacar *)
-    /\ UNCHANGED <<paralyzed, initiative>>  (* Mantém o estado de paralisia *)
 
 TurnHunter ==
     /\ currentTurn = Hunter
-    /\ hasAttacked[Hunter] = FALSE
-    /\ hp[Monster] > 0 (* Só reduz se ainda tiver HP *)
-    /\ hp' = [hp EXCEPT ![Monster] = @ - 5]
-    /\ hasAttacked' = [hasAttacked EXCEPT ![Hunter] = TRUE]
+    /\ creatures[Hunter].hasAttacked = FALSE
+    /\ creatures[Monster].hp > 0 (* Só reduz se ainda tiver HP *)
+    /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - 5]
+    /\ creatures' = [creatures EXCEPT ![Hunter].hasAttacked = TRUE]
     /\ currentTurn' = Monster  (* Define o próximo personagem a atacar *)
-    /\ UNCHANGED <<paralyzed, initiative>>  (* Mantém o estado de paralisia *)
 
 TurnMonster ==    
     /\ currentTurn = Monster  (* verifique se é o turno do monstro *)
-    /\ hasAttacked[Monster] = FALSE
-    /\ hp' = [hp EXCEPT ![Hunter] = @ - 5, ![Druid] = @ - 5, ![Mage] = @ - 5]
+    /\ creatures[Monster].hasAttacked = FALSE
+    /\ creatures' = [creatures EXCEPT ![Hunter].hp = @ - 5, ![Druid].hp = @ - 5, ![Mage].hp = @ - 5]    
+    /\ creatures' = [creatures EXCEPT ![Monster].hasAttacked = TRUE]
     /\ currentTurn' = Mage
-    /\ hasAttacked' = [hasAttacked EXCEPT ![Monster] = TRUE]    
-    /\ UNCHANGED <<paralyzed, initiative>>  (* Mantém o estado de paralisia *)
 
 ResetHasAttacked ==
     /\ currentTurn = Mage  (* Reinicia quando o turno volta ao Mage *)
-    /\ \A p \in DOMAIN hasAttacked : hasAttacked[p] = TRUE
-    /\ hasAttacked' = [ p \in DOMAIN hasAttacked |-> FALSE ]
-    /\ UNCHANGED <<hp, paralyzed, initiative, currentTurn>>
+    /\ \A p \in DOMAIN creatures : creatures[p].hasAttacked = TRUE
+    /\ creatures' = [creatures EXCEPT 
+            ![Hunter].hasAttacked = FALSE,
+            ![Druid].hasAttacked = FALSE,
+            ![Mage].hasAttacked = FALSE,
+            ![Monster].hasAttacked = FALSE
+        ]
 
 (* Transição de turno com condição de parada *)
 Next ==
@@ -102,7 +116,7 @@ Next ==
     \/ ResetHasAttacked
     \/ CheckVictory
 
-Spec == Init /\ [][Next]_<<hp, paralyzed, initiative, hasAttacked, currentTurn>>
+Spec == Init /\ [][Next]_<<currentTurn, creatures>>
 
 (* COISAS A FAZER
  
