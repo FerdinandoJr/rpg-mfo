@@ -114,14 +114,25 @@ TurnDruid ==
                         ![Druid].isBear = FALSE,                        (* Remove o status de urso *)
                         ![Druid].originalHP = 0
                     ]
+                 /\ IF CHOOSE x \in {TRUE, FALSE} : TRUE                    (* 50% de chance de transformar ou atacar *)
+                    THEN  /\ creatures' = [creatures EXCEPT 
+                                ![Druid].hp = 60,                           (* Define HP do urso *)
+                                ![Druid].isBear = TRUE,                     (* Marca a transformação *)
+                                ![Druid].originalHP = creatures[Druid].hp   (* Armazena HP original *)
+                            ]
+                    ELSE /\ creatures' = [creatures EXCEPT 
+                                ![Monster].hp = @ - creatures[Druid].attack (* Ataca o monstro *)
+                            ]
             ELSE 
-                IF TRUE                                                 (* Decisão de transformar ou atacar *)
-                THEN /\ creatures' = [creatures EXCEPT                  (* Transformação em urso *)
+                IF CHOOSE x \in {TRUE, FALSE} : TRUE                    (* 50% de chance de transformar ou atacar *)
+                THEN  /\ creatures' = [creatures EXCEPT 
                             ![Druid].hp = 60,                           (* Define HP do urso *)
                             ![Druid].isBear = TRUE,                     (* Marca a transformação *)
                             ![Druid].originalHP = creatures[Druid].hp   (* Armazena HP original *)
                         ]
-                ELSE /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - creatures[Druid].attack] (* Ataca o monstro *)
+                ELSE /\ creatures' = [creatures EXCEPT 
+                            ![Monster].hp = @ - creatures[Druid].attack (* Ataca o monstro *)
+                        ]
     /\ turns' = Tail(turns)                                         (* Remove a vez do Druid *)
 
 (* ------ Monster -------*)
