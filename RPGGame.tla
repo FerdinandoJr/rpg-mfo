@@ -9,7 +9,8 @@ CONSTANTS
 
 VARIABLES
     creatures,
-    turns
+    turns,
+    countTurns
     
 (* 
     Estado inicial:
@@ -53,18 +54,19 @@ Init ==
                      IF creatures[x].initiative = creatures[y].initiative 
                      THEN CreatureOrder[x] < CreatureOrder[y]
                      ELSE creatures[x].initiative > creatures[y].initiative)
+    /\ countTurns = 1
           
 (* Verifica se o HP do Monster chegou a 0, indicando vitória dos heróis *)
 VictoryHeroes ==
     /\ creatures[Monster].hp <= 0
-    /\ UNCHANGED <<creatures, turns>>
+    /\ UNCHANGED <<creatures, turns, countTurns>>
 
 (* Verifica se o HP de todos os heróis chegou a 0, indicando vitória do Monster *)
 VictoryMonster ==
     /\ creatures[Hunter].hp <= 0
     /\ creatures[Druid].hp <= 0
     /\ creatures[Mage].hp <= 0
-    /\ UNCHANGED <<creatures, turns>>
+    /\ UNCHANGED <<creatures, turns, countTurns>>
 
 (* ------ Hunter -------*)
 
@@ -81,6 +83,7 @@ TurnHunter ==
                         ]                     
         ELSE /\ UNCHANGED <<creatures>>
     /\ turns' = Tail(turns)        (* Hunter ataca se o Monstro já estiver cego *)
+    /\ countTurns' = countTurns + 1
 
 (* ------ Mage -------*)
 
@@ -92,6 +95,7 @@ TurnMage ==
              /\ turns' = Tail(turns)   (* Após atacar, remove a vez do Mage *)
         ELSE /\ turns' = Tail(turns)   (* Apenas remove a vez se o Mage estiver morto *)
              /\ UNCHANGED <<creatures>>
+    /\ countTurns' = countTurns + 1
 
 (* ------ Druid -------*)
 
@@ -134,6 +138,7 @@ TurnDruid ==
                             ![Monster].hp = @ - creatures[Druid].attack (* Ataca o monstro *)
                         ]
     /\ turns' = Tail(turns)                                         (* Remove a vez do Druid *)
+    /\ countTurns' = countTurns + 1
 
 (* ------ Monster -------*)
 TurnMonster ==    
@@ -146,8 +151,15 @@ TurnMonster ==
                 ELSE CHOOSE h \in {Hunter, Druid, Mage} : creatures[h].hp > 0
         IN IF creatures[Monster].isBlind 
             THEN [creatures EXCEPT ![Monster].isBlind = FALSE] (* Termina a cegueira *)
-            ELSE [creatures EXCEPT ![targetHero].hp = @ - creatures[Monster].attack]  (* Ataque normal *)
+            ELSE IF CHOOSE x \in {TRUE, FALSE} : TRUE    (* 50% de chance de atacar ou paralisar *)
+                THEN 
+                    [creatures EXCEPT ![targetHero].isParalyzed = TRUE]   (* Paralisia no alvo *)
+                ELSE                                             
+                    IF countTurns = 1   (* Verifica se é o primeiro turno para aplicar ataque reduzido *)
+                        THEN [ creatures EXCEPT ![targetHero].hp = @ - 10]  (* primeiro turno da partida indeira *)
+                        ELSE [ creatures EXCEPT ![targetHero].hp = @ - creatures[Monster].attack ]
     /\ turns' = Tail(turns)
+    /\ countTurns' = countTurns + 1
 
 ResetTurn == 
     /\ turns = <<>>
@@ -162,7 +174,7 @@ ResetTurn ==
                         THEN CreatureOrder[x] < CreatureOrder[y]
                         ELSE creatures[x].initiative > creatures[y].initiative
                     )
-                 /\ UNCHANGED <<creatures>>
+                 /\ UNCHANGED <<creatures, countTurns>>
 
 
 
@@ -174,7 +186,7 @@ Next ==
     \/ TurnHunter
     \/ TurnMonster
 
-Spec == Init /\ [][Next]_<<creatures, turns>>
+Spec == Init /\ [][Next]_<<creatures, turns, countTurns>>
     
 
 (* COISAS A FAZER
