@@ -73,52 +73,106 @@ VictoryMonster ==
 TurnHunter ==    
     /\ turns # <<>>
     /\ Head(turns) = Hunter
-    /\ IF creatures[Hunter].hp > 0
-        THEN IF creatures[Monster].isBlind = FALSE  (* Aplica cegueira apenas se o Monstro não estiver cego *)
-                THEN /\ creatures' = [
-                            creatures EXCEPT ![Monster].isBlind = TRUE
-                        ]
-                ELSE /\ creatures' = [
-                            creatures EXCEPT ![Monster].hp = @ - creatures[Hunter].attack
-                        ]                     
-        ELSE /\ UNCHANGED <<creatures>>
-    /\ turns' = Tail(turns)        (* Hunter ataca se o Monstro já estiver cego *)
     /\ countTurns' = countTurns + 1
+    /\ IF creatures[Druid].isParalyzed = TRUE (* Não pode efetuar ações se estiver paralisado *)    
+        THEN /\ UNCHANGED <<creatures>>
+        ELSE IF creatures[Hunter].hp > 0
+            THEN 
+                (* Verifica se há algum herói paralisado *)
+                LET paralyzedHeroes == {h \in {Druid, Mage} : creatures[h].isParalyzed = TRUE}
+                IN 
+                    IF paralyzedHeroes # {}
+                    THEN 
+                        LET paralyzedHero == CHOOSE h \in paralyzedHeroes : TRUE IN
+                            /\ creatures' = [creatures EXCEPT ![paralyzedHero].isParalyzed = FALSE]
+                            /\ turns' = Tail(turns)   (* Usa o turno para remover a paralisia *)
+                            /\ UNCHANGED <<creatures>>
+                        ELSE 
+                            (* Se nenhum herói estiver paralisado, ataque o Monstro ou Cegue ele*)
+                            IF creatures[Monster].isBlind = FALSE
+                                THEN /\ creatures' = [
+                                            creatures EXCEPT ![Monster].isBlind = TRUE
+                                        ]
+                                ELSE /\ creatures' = [
+                                            creatures EXCEPT ![Monster].hp = @ - creatures[Hunter].attack
+                                        ]                                    
+            ELSE /\ UNCHANGED <<creatures>>
+    /\ turns' = Tail(turns)
+
 
 (* ------ Mage -------*)
-
 TurnMage ==
     /\ turns # <<>>
     /\ Head(turns) = Mage
-    /\ IF creatures[Mage].hp > 0
-        THEN /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - creatures[Mage].attack]
-             /\ turns' = Tail(turns)   (* Após atacar, remove a vez do Mage *)
-        ELSE /\ turns' = Tail(turns)   (* Apenas remove a vez se o Mage estiver morto *)
-             /\ UNCHANGED <<creatures>>
     /\ countTurns' = countTurns + 1
-
+    /\  IF creatures[Mage].isParalyzed = TRUE (* Não pode efetuar ações se estiver paralisado *)    
+        THEN /\ UNCHANGED <<creatures>>
+        ELSE IF creatures[Mage].hp > 0 (* Mago ainda está vivo *)
+            THEN 
+                (* Verifica se há algum herói paralisado *)
+                LET paralyzedHeroes == {h \in {Druid, Hunter} : creatures[h].isParalyzed = TRUE}
+                IN 
+                    IF paralyzedHeroes # {}
+                    THEN 
+                        LET paralyzedHero == CHOOSE h \in paralyzedHeroes : TRUE IN
+                            /\ creatures' = [creatures EXCEPT ![paralyzedHero].isParalyzed = FALSE]
+                            /\ turns' = Tail(turns)   (* Usa o turno para remover a paralisia *)
+                            /\ UNCHANGED <<creatures>>
+                    ELSE /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - creatures[Mage].attack]
+                         /\ turns' = Tail(turns)   (* Após atacar, remove a vez do Mage *)                   
+            ELSE /\ UNCHANGED <<creatures>>
+    /\ turns' = Tail(turns)   (* Usa o turno para remover a paralisia *)
 (* ------ Druid -------*)
 
 TurnDruid ==
     /\ turns # <<>> 
     /\ Head(turns) = Druid
-    /\ IF creatures[Druid].hp <= 0                                  (* Druid morreu *)
-        THEN 
-            IF creatures[Druid].isBear = TRUE                       (* Morreu enquanto estava transformado *)  
-            THEN /\ creatures' = [creatures EXCEPT                  (* Reverte a transformação *)
-                        ![Druid].hp = creatures[Druid].originalHP,  (* Restaura HP original *)
-                        ![Druid].isBear = FALSE,                    (* Remove o status de urso *)
-                        ![Druid].originalHP = 0
-                    ]
-            ELSE /\ UNCHANGED <<creatures>>                         (* Sem transformação ativa, nada muda *)
-        ELSE 
-            IF creatures[Druid].isBear = TRUE                           (* Druid está em forma de urso e vivo *)
-            THEN /\ creatures' = [creatures EXCEPT                      (* Expira a transformação *)
-                        ![Druid].hp = creatures[Druid].originalHP,      (* Restaura HP original *)
-                        ![Druid].isBear = FALSE,                        (* Remove o status de urso *)
-                        ![Druid].originalHP = 0
-                    ]
-                 /\ IF CHOOSE x \in {TRUE, FALSE} : TRUE                    (* 50% de chance de transformar ou atacar *)
+    /\ countTurns' = countTurns + 1
+    /\  IF creatures[Druid].isParalyzed = TRUE (* Não pode efetuar ações se estiver paralisado *)    
+        THEN /\ UNCHANGED <<creatures>>
+        ELSE IF creatures[Druid].hp <= 0                                  (* Druid morreu *)
+            THEN 
+                IF creatures[Druid].isBear = TRUE                       (* Morreu enquanto estava transformado *)  
+                THEN /\ creatures' = [creatures EXCEPT                  (* Reverte a transformação *)
+                            ![Druid].hp = creatures[Druid].originalHP,  (* Restaura HP original *)
+                            ![Druid].isBear = FALSE,                    (* Remove o status de urso *)
+                            ![Druid].originalHP = 0
+                        ]
+                ELSE 
+                    IF creatures[Druid].isBear = TRUE                           (* Druid está em forma de urso e vivo *)
+                    THEN /\ creatures' = [creatures EXCEPT                      (* Expira a transformação *)
+                                ![Druid].hp = creatures[Druid].originalHP,      (* Restaura HP original *)
+                                ![Druid].isBear = FALSE,                        (* Remove o status de urso *)
+                                ![Druid].originalHP = 0
+                            ]
+                        /\ IF CHOOSE x \in {TRUE, FALSE} : TRUE                    (* 50% de chance de transformar ou atacar *)
+                            THEN  /\ creatures' = [creatures EXCEPT 
+                                        ![Druid].hp = 60,                           (* Define HP do urso *)
+                                        ![Druid].isBear = TRUE,                     (* Marca a transformação *)
+                                        ![Druid].originalHP = creatures[Druid].hp   (* Armazena HP original *)
+                                    ]
+                            ELSE /\ creatures' = [creatures EXCEPT 
+                                        ![Monster].hp = @ - creatures[Druid].attack (* Ataca o monstro *)
+                                    ]
+                    ELSE /\ UNCHANGED <<creatures>>                         (* Não ta transformado e está morto*)                              
+            ELSE 
+                IF creatures[Druid].isBear = TRUE                           (* Druid está em forma de urso e vivo *)
+                THEN /\ creatures' = [creatures EXCEPT                      (* Expira a transformação *)
+                            ![Druid].hp = creatures[Druid].originalHP,      (* Restaura HP original *)
+                            ![Druid].isBear = FALSE,                        (* Remove o status de urso *)
+                            ![Druid].originalHP = 0
+                        ]
+                    /\ IF CHOOSE x \in {TRUE, FALSE} : TRUE                    (* 50% de chance de transformar ou atacar *)
+                        THEN  /\ creatures' = [creatures EXCEPT 
+                                    ![Druid].hp = 60,                           (* Define HP do urso *)
+                                    ![Druid].isBear = TRUE,                     (* Marca a transformação *)
+                                    ![Druid].originalHP = creatures[Druid].hp   (* Armazena HP original *)
+                                ]
+                        ELSE /\ creatures' = [creatures EXCEPT 
+                                    ![Monster].hp = @ - creatures[Druid].attack (* Ataca o monstro *)
+                                ]
+                ELSE 
+                    IF CHOOSE x \in {TRUE, FALSE} : TRUE                    (* 50% de chance de transformar ou atacar *)
                     THEN  /\ creatures' = [creatures EXCEPT 
                                 ![Druid].hp = 60,                           (* Define HP do urso *)
                                 ![Druid].isBear = TRUE,                     (* Marca a transformação *)
@@ -127,18 +181,7 @@ TurnDruid ==
                     ELSE /\ creatures' = [creatures EXCEPT 
                                 ![Monster].hp = @ - creatures[Druid].attack (* Ataca o monstro *)
                             ]
-            ELSE 
-                IF CHOOSE x \in {TRUE, FALSE} : TRUE                    (* 50% de chance de transformar ou atacar *)
-                THEN  /\ creatures' = [creatures EXCEPT 
-                            ![Druid].hp = 60,                           (* Define HP do urso *)
-                            ![Druid].isBear = TRUE,                     (* Marca a transformação *)
-                            ![Druid].originalHP = creatures[Druid].hp   (* Armazena HP original *)
-                        ]
-                ELSE /\ creatures' = [creatures EXCEPT 
-                            ![Monster].hp = @ - creatures[Druid].attack (* Ataca o monstro *)
-                        ]
     /\ turns' = Tail(turns)                                         (* Remove a vez do Druid *)
-    /\ countTurns' = countTurns + 1
 
 (* ------ Monster -------*)
 TurnMonster ==    
@@ -178,6 +221,19 @@ ResetTurn ==
 
 
 
+RemoveParalysis ==
+    LET paralyzedHeroes == {h \in {Mage, Druid, Hunter} : creatures[h].isParalyzed = TRUE}
+    IN 
+        IF paralyzedHeroes # {}
+        THEN 
+            LET paralyzedHero == CHOOSE h \in paralyzedHeroes : TRUE
+            IN 
+                /\ creatures' = [creatures EXCEPT ![paralyzedHero].isParalyzed = FALSE]
+                /\ turns' = Tail(turns)
+                /\ countTurns' = countTurns + 1
+        ELSE 
+            /\ UNCHANGED <<creatures, turns, countTurns>>
+
 (* Transição de turno com condição de parada *)
 Next ==
     \/ (turns = <<>> /\ ResetTurn)
@@ -192,8 +248,6 @@ Spec == Init /\ [][Next]_<<creatures, turns, countTurns>>
 (* COISAS A FAZER
  
  - Criar Habilidade Ilusão do Mage
- - Criar Habilidade Cegueira do Hunter
- - Criar Habilidade paralisia do Monster
  - Criar Maneira dos personagens sair da paralisa
 
 *)
