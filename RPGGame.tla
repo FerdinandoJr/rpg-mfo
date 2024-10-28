@@ -70,31 +70,39 @@ TurnMage ==
     /\ currentTurn = Mage
     /\ creatures[Mage].hasAttacked = FALSE
     /\ creatures[Monster].hp > 0 (* Só reduz se ainda tiver HP *)
-    /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - 5]
-    /\ creatures' = [creatures EXCEPT ![Mage].hasAttacked = TRUE]
+    /\ creatures' = [ creatures EXCEPT 
+            ![Monster].hp = @ - 5,
+            ![Mage].hasAttacked = TRUE
+        ]
     /\ currentTurn' = Druid  (* Define o próximo personagem a atacar *)
 
 TurnDruid ==
     /\ currentTurn = Druid
     /\ creatures[Druid].hasAttacked = FALSE
     /\ creatures[Monster].hp > 0 (* Só reduz se ainda tiver HP *)
-    /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - 5]
-    /\ creatures' = [creatures EXCEPT ![Druid].hasAttacked = TRUE]
+    /\ creatures' = [ creatures EXCEPT 
+            ![Monster].hp = @ - 5,
+            ![Druid].hasAttacked = TRUE
+        ]
     /\ currentTurn' = Hunter  (* Define o próximo personagem a atacar *)
 
 TurnHunter ==
     /\ currentTurn = Hunter
     /\ creatures[Hunter].hasAttacked = FALSE
     /\ creatures[Monster].hp > 0 (* Só reduz se ainda tiver HP *)
-    /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - 5]
-    /\ creatures' = [creatures EXCEPT ![Hunter].hasAttacked = TRUE]
+    /\ creatures' = [ creatures EXCEPT 
+            ![Monster].hp = @ - 5,
+            ![Hunter].hasAttacked = TRUE
+        ]    
     /\ currentTurn' = Monster  (* Define o próximo personagem a atacar *)
 
 TurnMonster ==    
     /\ currentTurn = Monster  (* verifique se é o turno do monstro *)
     /\ creatures[Monster].hasAttacked = FALSE
-    /\ creatures' = [creatures EXCEPT ![Hunter].hp = @ - 5, ![Druid].hp = @ - 5, ![Mage].hp = @ - 5]    
-    /\ creatures' = [creatures EXCEPT ![Monster].hasAttacked = TRUE]
+    /\ creatures' = [ creatures EXCEPT 
+            ![Hunter].hp = @ - 5, ![Druid].hp = @ - 5, ![Mage].hp = @ - 5,
+            ![Monster].hasAttacked = TRUE
+        ]
     /\ currentTurn' = Mage
 
 ResetHasAttacked ==
@@ -106,6 +114,7 @@ ResetHasAttacked ==
             ![Mage].hasAttacked = FALSE,
             ![Monster].hasAttacked = FALSE
         ]
+    /\ UNCHANGED <<currentTurn>>
 
 (* Transição de turno com condição de parada *)
 Next ==
@@ -114,9 +123,10 @@ Next ==
     \/ TurnHunter
     \/ TurnMonster
     \/ ResetHasAttacked
-    \/ CheckVictory
 
 Spec == Init /\ [][Next]_<<currentTurn, creatures>>
+Invariance == 
+    /\ CheckVictory
 
 (* COISAS A FAZER
  
