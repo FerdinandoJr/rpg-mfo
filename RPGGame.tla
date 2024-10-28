@@ -1,5 +1,5 @@
 ------------------------------- MODULE RPGGame -------------------------------
-EXTENDS Randomization, Naturals, Sequences
+EXTENDS Randomization, Naturals, Sequences, TLC 
 
 CONSTANTS
     Hunter, 
@@ -9,57 +9,59 @@ CONSTANTS
 
 VARIABLES
     creatures,
-    currentTurn
+    turns
+    
 (* 
     Estado inicial:
     - Cada personagem começa com 20 HP, e o monstro com 100 HP.
 *)
 
+CreatureOrder == [Hunter |-> 1, Druid |-> 2, Mage |-> 3, Monster |-> 4]
+
 Init ==
     /\ creatures = [ 
 		Hunter |-> [
-			    hp |-> 20,
-			    hasAttacked |-> FALSE,
-                attack |-> 5,
+			    hp |-> 20,			
                 initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
+                attack |-> 5,
                 isParalyzed |-> FALSE
 		    ], 
 		Druid |-> [
-			    hp |-> 20,
-			    hasAttacked |-> FALSE,
-                attack |-> 5,
+			    hp |-> 20,			
                 initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
+                attack |-> 5,
                 isParalyzed |-> FALSE
 		    ], 
 		Mage |-> [
 			    hp |-> 20,
-			    hasAttacked |-> FALSE,
-                attack |-> 5,
                 initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
+                attack |-> 5,
                 isParalyzed |-> FALSE
 		    ],
 		Monster |-> [
                 hp |-> 100,
-                hasAttacked |-> FALSE,
-                attack |-> 5,
                 initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
+                attack |-> 5,
                 isParalyzed |-> FALSE
 		    ]
-	    ]    
-    /\ currentTurn = Mage
-
-
+	    ]   
+    /\ turns = SortSeq(<<Hunter, Druid, Mage, Monster>>,
+                 LAMBDA x, y: 
+                     IF creatures[x].initiative = creatures[y].initiative 
+                     THEN CreatureOrder[x] < CreatureOrder[y]
+                     ELSE creatures[x].initiative > creatures[y].initiative)
+          
 (* Verifica se o HP do Monster chegou a 0, indicando vitória dos heróis *)
 VictoryHeroes ==
     /\ creatures[Monster].hp <= 0
-    /\ UNCHANGED <<creatures, currentTurn>>
+    /\ UNCHANGED <<creatures, turns>>
 
 (* Verifica se o HP de todos os heróis chegou a 0, indicando vitória do Monster *)
 VictoryMonster ==
     /\ creatures[Hunter].hp <= 0
     /\ creatures[Druid].hp <= 0
     /\ creatures[Mage].hp <= 0
-    /\ UNCHANGED <<creatures, currentTurn>>
+    /\ UNCHANGED <<creatures, turns>>
 
 (* Verifica se ocorreu uma condição de vitória *)
 CheckVictory ==
@@ -67,67 +69,62 @@ CheckVictory ==
     \/ VictoryMonster
 
 TurnMage ==
-    /\ currentTurn = Mage
-    /\ creatures[Mage].hasAttacked = FALSE
-    /\ creatures[Monster].hp > 0 (* Só reduz se ainda tiver HP *)
-    /\ creatures' = [ creatures EXCEPT 
-            ![Monster].hp = @ - creatures[Mage].attack,
-            ![Mage].hasAttacked = TRUE
+    /\ turns # <<>>                (* Verifica se turns não está vazio *)
+    /\ Head(turns) = Mage
+    /\ creatures[Monster].hp > 0
+    /\ creatures' = [creatures EXCEPT 
+            ![Monster].hp = @ - creatures[Mage].attack
         ]
-    /\ currentTurn' = Druid  (* Define o próximo personagem a atacar *)
-
+    /\ turns' = Tail(turns)
+    
 TurnDruid ==
-    /\ currentTurn = Druid
-    /\ creatures[Druid].hasAttacked = FALSE
-    /\ creatures[Monster].hp > 0 (* Só reduz se ainda tiver HP *)
-    /\ creatures' = [ creatures EXCEPT 
-            ![Monster].hp = @ - creatures[Druid].attack,
-            ![Druid].hasAttacked = TRUE
+    /\ turns # <<>>                (* Verifica se turns não está vazio *)
+    /\ Head(turns) = Druid
+    /\ creatures[Monster].hp > 0
+    /\ creatures' = [creatures EXCEPT 
+            ![Monster].hp = @ - creatures[Druid].attack            
         ]
-    /\ currentTurn' = Hunter  (* Define o próximo personagem a atacar *)
+    /\ turns' = Tail(turns)
 
 TurnHunter ==
-    /\ currentTurn = Hunter
-    /\ creatures[Hunter].hasAttacked = FALSE
-    /\ creatures[Monster].hp > 0 (* Só reduz se ainda tiver HP *)
-    /\ creatures' = [ creatures EXCEPT 
-            ![Monster].hp = @ - creatures[Hunter].attack,
-            ![Hunter].hasAttacked = TRUE
-        ]    
-    /\ currentTurn' = Monster  (* Define o próximo personagem a atacar *)
+    /\ turns # <<>>                (* Verifica se turns não está vazio *)
+    /\ Head(turns) = Hunter
+    /\ creatures[Monster].hp > 0
+    /\ creatures' = [creatures EXCEPT 
+            ![Monster].hp = @ - creatures[Hunter].attack
+        ]
+    /\ turns' = Tail(turns)
 
 TurnMonster ==    
-    /\ currentTurn = Monster  (* verifique se é o turno do monstro *)
-    /\ creatures[Monster].hasAttacked = FALSE
-    /\ creatures' = [ creatures EXCEPT 
+    /\ turns # <<>>                (* Verifica se turns não está vazio *)
+    /\ Head(turns) = Monster
+    /\ creatures' = [creatures EXCEPT 
             ![Hunter].hp = @ - creatures[Monster].attack,
             ![Druid].hp = @ - creatures[Monster].attack, 
-            ![Mage].hp = @ - creatures[Monster].attack,
-            ![Monster].hasAttacked = TRUE
+            ![Mage].hp = @ - creatures[Monster].attack
         ]
-    /\ currentTurn' = Mage
+    /\ turns' = Tail(turns)
 
-ResetHasAttacked ==
-    /\ currentTurn = Mage  (* Reinicia quando o turno volta ao Mage *)
-    /\ \A p \in DOMAIN creatures : creatures[p].hasAttacked = TRUE
-    /\ creatures' = [creatures EXCEPT 
-            ![Hunter].hasAttacked = FALSE,
-            ![Druid].hasAttacked = FALSE,
-            ![Mage].hasAttacked = FALSE,
-            ![Monster].hasAttacked = FALSE
-        ]
-    /\ UNCHANGED <<currentTurn>>
+NextTurn ==    
+    /\ turns = <<>>
+    /\ turns'= SortSeq(<<Hunter, Druid, Mage, Monster>>,
+                 LAMBDA x, y: 
+                     IF creatures[x].initiative = creatures[y].initiative 
+                     THEN CreatureOrder[x] < CreatureOrder[y]
+                     ELSE creatures[x].initiative > creatures[y].initiative)
+    /\ UNCHANGED <<creatures>>
+
 
 (* Transição de turno com condição de parada *)
 Next ==
     \/ CheckVictory
+    \/ NextTurn  (* Recarrega turns quando vazio *)
     \/ TurnMage
     \/ TurnDruid
     \/ TurnHunter
     \/ TurnMonster
-    \/ ResetHasAttacked
 
-Spec == Init /\ [][Next]_<<currentTurn, creatures>>
+Spec == Init /\ [][Next]_<<creatures, turns>>
     
 
 (* COISAS A FAZER
