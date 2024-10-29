@@ -39,7 +39,9 @@ Init ==
 			    hp |-> 20,
                 initiative |-> CHOOSE x \in RandomSubset(1, 1..20) : TRUE,
                 attack |-> 10,
-                isParalyzed |-> FALSE
+                isParalyzed |-> FALSE,
+                illusionExists |-> FALSE,
+                illusionHP |-> 0
 		    ],
 		Monster |-> [
                 hp |-> 100,
@@ -105,23 +107,42 @@ TurnMage ==
     /\ turns # <<>>
     /\ Head(turns) = Mage
     /\ countTurns' = countTurns + 1
-    /\  IF creatures[Mage].isParalyzed = TRUE (* Não pode efetuar ações se estiver paralisado *)    
+    /\ turns' = Tail(turns)
+    /\ IF creatures[Mage].isParalyzed = TRUE    
         THEN /\ UNCHANGED <<creatures>>
-        ELSE IF creatures[Mage].hp > 0 (* Mago ainda está vivo *)
+        ELSE IF creatures[Mage].hp > 0
             THEN 
-                (* Verifica se há algum herói paralisado *)
                 LET paralyzedHeroes == {h \in {Druid, Hunter} : creatures[h].isParalyzed = TRUE}
                 IN 
                     IF paralyzedHeroes # {}
                     THEN 
                         LET paralyzedHero == CHOOSE h \in paralyzedHeroes : TRUE IN
                             /\ creatures' = [creatures EXCEPT ![paralyzedHero].isParalyzed = FALSE]
-                            /\ turns' = Tail(turns)   (* Usa o turno para remover a paralisia *)
-                            /\ UNCHANGED <<creatures>>
-                    ELSE /\ creatures' = [creatures EXCEPT ![Monster].hp = @ - creatures[Mage].attack]
-                         /\ turns' = Tail(turns)   (* Após atacar, remove a vez do Mage *)                   
-            ELSE /\ UNCHANGED <<creatures>>
-    /\ turns' = Tail(turns)   (* Usa o turno para remover a paralisia *)
+                    ELSE 
+                        IF creatures[Mage].illusionExists = FALSE  (* Não existe ilusão *)
+                        THEN 
+                            /\ creatures' = [ creatures EXCEPT  (* Cria a ilusão *)
+                                    ![Mage].illusionExists = TRUE,
+                                    ![Mage].illusionHP = 1,
+                                    ![Monster].hp = @ - creatures[Mage].attack (* Ataca o monstro *)
+                                ]
+                        ELSE (* Ilusão existe *)                        
+                            IF CHOOSE x \in {TRUE, FALSE} : TRUE    (* 50% de chance de atacar ou criar ilusão *)
+                            THEN 
+                                /\ creatures' = [ creatures EXCEPT  (* Desfaz a ilusão *)
+                                        ![Mage].illusionExists = FALSE,
+                                        ![Mage].illusionHP = 0,
+                                        ![Monster].hp = @ - creatures[Mage].attack (* Ataca o monstro *)
+                                    ]
+                            ELSE                                             
+                                /\ creatures' = [ creatures EXCEPT  (* Refaz a ilusão *)
+                                        ![Mage].illusionExists = TRUE,
+                                        ![Mage].illusionHP = 1,
+                                        ![Monster].hp = @ - creatures[Mage].attack (* Ataca o monstro *)
+                                    ]    
+            ELSE 
+                /\ UNCHANGED <<creatures>> (* Mago está morto *)
+
 (* ------ Druid -------*)
 
 TurnDruid ==
@@ -251,7 +272,6 @@ Spec == Init /\ [][Next]_<<creatures, turns, countTurns>>
 (* COISAS A FAZER
  
  - Criar Habilidade Ilusão do Mage
- - Criar Maneira dos personagens sair da paralisa
 
 *)
 
