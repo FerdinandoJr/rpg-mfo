@@ -187,7 +187,7 @@ TurnDruid ==
                             ![Druid].isBear = FALSE,                        (* Remove o status de urso *)
                             ![Druid].originalHP = 0
                         ]
-                    /\ LET paralyzedHeroes == {h \in {Druid, Hunter} : creatures[h].isParalyzed = TRUE} IN 
+                    /\ LET paralyzedHeroes == {h \in {Mage, Hunter} : creatures[h].isParalyzed = TRUE} IN 
                         IF paralyzedHeroes # {}
                         THEN 
                             \/(LET paralyzedHero == CHOOSE h \in paralyzedHeroes : TRUE IN
@@ -213,7 +213,7 @@ TurnDruid ==
                                             ![Monster].hp = @ - creatures[Druid].attack (* Ataca o monstro *)
                                         ]
                     ELSE 
-                        LET paralyzedHeroes == {h \in {Druid, Hunter} : creatures[h].isParalyzed = TRUE}
+                        LET paralyzedHeroes == {h \in {Mage, Hunter} : creatures[h].isParalyzed = TRUE}
                         IN 
                             IF paralyzedHeroes # {}
                             THEN 
@@ -248,13 +248,20 @@ TurnMonster ==
         LET targetHero == 
             IF creatures[Druid].isBear = TRUE  (* Preferência para atacar o Druid Transformado *)
                 THEN Druid
-                ELSE CHOOSE h \in {Hunter, Druid, Mage} : creatures[h].hp > 0
+		ELSE
+		IF creature[Mage].illusionExists = TRUE
+		THEN Mage
+                ELSE 
+		CHOOSE h \in {Hunter, Druid, Mage} : creatures[h].hp > 0
         IN IF creatures[Monster].isBlind 
             THEN [creatures EXCEPT ![Monster].isBlind = FALSE] (* Termina a cegueira *)
             ELSE IF CHOOSE x \in {TRUE, FALSE} : TRUE    (* 50% de chance de atacar ou paralisar *)
                 THEN 
                     [creatures EXCEPT ![targetHero].isParalyzed = TRUE]   (* Paralisia no alvo *)
-                ELSE                                             
+                ELSE
+		    IF creatures[Mage].illusionExists = TRUE
+                    THEN [ creatures EXCEPT ![targetHero].illusionHP = @ - 1]
+                    ELSE
                     IF countTurns = 1   (* Verifica se é o primeiro turno para aplicar ataque reduzido *)
                         THEN [ creatures EXCEPT ![targetHero].hp = @ - 10]  (* primeiro turno da partida indeira *)
                         ELSE [ creatures EXCEPT ![targetHero].hp = @ - creatures[Monster].attack ]
