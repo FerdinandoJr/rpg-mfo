@@ -85,19 +85,24 @@ TurnHunter ==
                 IN 
                     IF paralyzedHeroes # {}
                     THEN 
-                        LET paralyzedHero == CHOOSE h \in paralyzedHeroes : TRUE IN
-                            /\ creatures' = [creatures EXCEPT ![paralyzedHero].isParalyzed = FALSE]
-                            /\ turns' = Tail(turns)   (* Usa o turno para remover a paralisia *)
-                            /\ UNCHANGED <<creatures>>
+                            \/(LET paralyzedHero == CHOOSE h \in paralyzedHeroes : TRUE IN
+                                    /\ creatures' = [creatures EXCEPT ![paralyzedHero].isParalyzed = FALSE]
+                                    /\ turns' = Tail(turns)   (* Usa o turno para remover a paralisia *)
+                                    /\ UNCHANGED <<creatures>>)
+                            \/(creatures' = [
+                                            creatures EXCEPT ![Monster].isBlind = TRUE
+                                        ])
+                            \/(creatures' = [
+                                            creatures EXCEPT ![Monster].hp = @ - creatures[Hunter].attack
+                                        ])
                         ELSE 
                             (* Se nenhum herói estiver paralisado, ataque o Monstro ou Cegue ele*)
-                            IF creatures[Monster].isBlind = FALSE
-                                THEN /\ creatures' = [
+                                \/(creatures' = [
                                             creatures EXCEPT ![Monster].isBlind = TRUE
-                                        ]
-                                ELSE /\ creatures' = [
+                                        ])
+                                \/(creatures' = [
                                             creatures EXCEPT ![Monster].hp = @ - creatures[Hunter].attack
-                                        ]                                    
+                                        ])                         
             ELSE /\ UNCHANGED <<creatures>>
     /\ turns' = Tail(turns)
 
@@ -116,30 +121,29 @@ TurnMage ==
                 IN 
                     IF paralyzedHeroes # {}
                     THEN 
-                        LET paralyzedHero == CHOOSE h \in paralyzedHeroes : TRUE IN
-                            /\ creatures' = [creatures EXCEPT ![paralyzedHero].isParalyzed = FALSE]
-                    ELSE 
-                        IF creatures[Mage].illusionExists = FALSE  (* Não existe ilusão *)
+                        \/(LET paralyzedHero == CHOOSE h \in paralyzedHeroes : TRUE IN
+                                /\ creatures' = [creatures EXCEPT ![paralyzedHero].isParalyzed = FALSE])
+                        \/(creatures' = [ creatures EXCEPT  (* Refaz a ilusão *)
+                                        ![Mage].illusionExists = TRUE,
+                                        ![Mage].illusionHP = 1])
+                        \/(creatures' = [ creatures EXCEPT  (* Desfaz a ilusão *)
+                                    ![Mage].illusionExists = FALSE,
+                                    ![Mage].illusionHP = 0,
+                                    ![Monster].hp = @ - creatures[Mage].attack (* Ataca o monstro *)
+                                ])
+                    ELSE                      
+                        IF CHOOSE x \in {TRUE, FALSE} : TRUE    (* 50% de chance de atacar ou criar ilusão *)
                         THEN 
-                            /\ creatures' = [ creatures EXCEPT  (* Cria a ilusão *)
-                                    ![Mage].illusionExists = TRUE,
-                                    ![Mage].illusionHP = 1,
+                            /\ creatures' = [ creatures EXCEPT  (* Desfaz a ilusão *)
+                                    ![Mage].illusionExists = FALSE,
+                                    ![Mage].illusionHP = 0,
                                     ![Monster].hp = @ - creatures[Mage].attack (* Ataca o monstro *)
                                 ]
-                        ELSE (* Ilusão existe *)                        
-                            IF CHOOSE x \in {TRUE, FALSE} : TRUE    (* 50% de chance de atacar ou criar ilusão *)
-                            THEN 
-                                /\ creatures' = [ creatures EXCEPT  (* Desfaz a ilusão *)
-                                        ![Mage].illusionExists = FALSE,
-                                        ![Mage].illusionHP = 0,
-                                        ![Monster].hp = @ - creatures[Mage].attack (* Ataca o monstro *)
-                                    ]
-                            ELSE                                             
-                                /\ creatures' = [ creatures EXCEPT  (* Refaz a ilusão *)
-                                        ![Mage].illusionExists = TRUE,
-                                        ![Mage].illusionHP = 1,
-                                        ![Monster].hp = @ - creatures[Mage].attack (* Ataca o monstro *)
-                                    ]    
+                        ELSE                                             
+                            /\ creatures' = [ creatures EXCEPT  (* Refaz a ilusão *)
+                                    ![Mage].illusionExists = TRUE,
+                                    ![Mage].illusionHP = 1
+                                ]    
             ELSE 
                 /\ UNCHANGED <<creatures>> (* Mago está morto *)
 
@@ -186,10 +190,19 @@ TurnDruid ==
                     /\ LET paralyzedHeroes == {h \in {Druid, Hunter} : creatures[h].isParalyzed = TRUE} IN 
                         IF paralyzedHeroes # {}
                         THEN 
-                            LET paralyzedHero == CHOOSE h \in paralyzedHeroes : TRUE IN
+                            \/(LET paralyzedHero == CHOOSE h \in paralyzedHeroes : TRUE IN
                                 /\ creatures' = [creatures EXCEPT ![paralyzedHero].isParalyzed = FALSE]
                                 /\ turns' = Tail(turns)   (* Usa o turno para remover a paralisia *)
-                                /\ UNCHANGED <<creatures>>    
+                                /\ UNCHANGED <<creatures>>)
+                            \/(creatures' = [creatures EXCEPT 
+                                            ![Druid].hp = 60,                           (* Define HP do urso *)
+                                            ![Druid].isBear = TRUE,                     (* Marca a transformação *)
+                                            ![Druid].originalHP = creatures[Druid].hp   (* Armazena HP original *)
+                                        ])
+                            \/(creatures' = [creatures EXCEPT 
+                                            ![Monster].hp = @ - creatures[Druid].attack (* Ataca o monstro *)
+                                        ])
+
                         ELSE /\ IF CHOOSE x \in {TRUE, FALSE} : TRUE                    (* 50% de chance de transformar ou atacar *)
                                 THEN  /\ creatures' = [creatures EXCEPT 
                                             ![Druid].hp = 60,                           (* Define HP do urso *)
@@ -204,10 +217,18 @@ TurnDruid ==
                         IN 
                             IF paralyzedHeroes # {}
                             THEN 
-                                LET paralyzedHero == CHOOSE h \in paralyzedHeroes : TRUE IN
+                                \/(LET paralyzedHero == CHOOSE h \in paralyzedHeroes : TRUE IN
                                     /\ creatures' = [creatures EXCEPT ![paralyzedHero].isParalyzed = FALSE]
                                     /\ turns' = Tail(turns)   (* Usa o turno para remover a paralisia *)
-                                    /\ UNCHANGED <<creatures>>
+                                    /\ UNCHANGED <<creatures>>)
+                                \/(creatures' = [creatures EXCEPT 
+                                            ![Druid].hp = 60,                           (* Define HP do urso *)
+                                            ![Druid].isBear = TRUE,                     (* Marca a transformação *)
+                                            ![Druid].originalHP = creatures[Druid].hp   (* Armazena HP original *)
+                                        ])
+                                \/(creatures' = [creatures EXCEPT 
+                                            ![Monster].hp = @ - creatures[Druid].attack (* Ataca o monstro *)
+                                        ])
                             ELSE IF CHOOSE x \in {TRUE, FALSE} : TRUE                    (* 50% de chance de transformar ou atacar *)
                                 THEN  /\ creatures' = [creatures EXCEPT 
                                             ![Druid].hp = 60,                           (* Define HP do urso *)
@@ -267,13 +288,12 @@ Next ==
     \/ TurnMonster
 
 Spec == Init /\ [][Next]_<<creatures, turns, countTurns>>
-    
 
-(* COISAS A FAZER
- 
- - Criar Habilidade Ilusão do Mage
+(* invariantes *)
+MonstroNaoMorre == creatures["Monster"].hp > 0
 
-*)
+NenhumPersonagemMorre == /\ creatures["Mage"].hp > 0
+                         /\ creatures["Druid"].hp > 0
+                         /\ creatures["Hunter"].hp > 0
 
 =============================================================================
-
